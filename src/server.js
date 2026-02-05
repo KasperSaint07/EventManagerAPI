@@ -9,6 +9,7 @@
 require('dotenv').config();
 
 const app = require('./app');
+const connectDB = require('./config/db');
 
 // ======================
 // CONFIGURATION
@@ -20,7 +21,21 @@ const PORT = process.env.PORT || 5000;
 // START SERVER
 // ======================
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-});
+/**
+ * Initialize the server
+ * 1. Connect to MongoDB
+ * 2. Start Express server
+ */
+const startServer = async () => {
+  // Connect to MongoDB
+  await connectDB();
+
+  // Start listening for requests
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+  });
+};
+
+// Start the server
+startServer();
