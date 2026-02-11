@@ -1,6 +1,17 @@
 const User = require('../models/User');
 const { isValidObjectId } = require('../utils/validators');
 
+// GET /api/admin/users
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.status(200).json({ success: true, count: users.length, data: users });
+  } catch (error) {
+    console.error('Get users error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // POST /api/admin/users/:id/make-super-admin
 const makeSuperAdmin = async (req, res) => {
   try {
@@ -25,4 +36,4 @@ const makeSuperAdmin = async (req, res) => {
   }
 };
 
-module.exports = { makeSuperAdmin };
+module.exports = { getAllUsers, makeSuperAdmin };

@@ -3,7 +3,7 @@ const router = express.Router();
 const { auth, authorize } = require('../middleware/auth');
 const { getOrganizerRequests, approveOrganizerRequest, rejectOrganizerRequest } = require('../controllers/organizerRequestController');
 const { getDeleteRequests, approveDeleteRequest, rejectDeleteRequest } = require('../controllers/eventDeleteRequestController');
-const { makeSuperAdmin } = require('../controllers/adminController');
+const { getAllUsers, makeSuperAdmin } = require('../controllers/adminController');
 
 // All routes require super_admin
 router.use(auth, authorize('super_admin'));
@@ -19,6 +19,7 @@ router.post('/event-delete-requests/:id/approve', approveDeleteRequest);
 router.post('/event-delete-requests/:id/reject', rejectDeleteRequest);
 
 // User management
+router.get('/users', getAllUsers);
 router.post('/users/:id/make-super-admin', makeSuperAdmin);
 
 module.exports = router;

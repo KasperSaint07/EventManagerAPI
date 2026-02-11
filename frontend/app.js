@@ -1,5 +1,5 @@
 // CONFIG
-const API_URL = 'http://localhost:5000/api';
+const API_URL = window.location.origin + '/api';
 
 // STATE
 let currentPage = 'home';
@@ -35,6 +35,7 @@ function navigateTo(page, data) {
   switch (page) {
     case 'home':
       window.scrollTo(0, 0);
+      loadEvents(currentEventPage);
       break;
     case 'event':
       window.scrollTo(0, 0);
@@ -44,6 +45,14 @@ function navigateTo(page, data) {
       if (!token) { navigateTo('login'); return; }
       loadProfile();
       loadMyRegistrations();
+      break;
+    case 'create-event':
+      if (!token) { navigateTo('login'); return; }
+      clearFormErrors();
+      break;
+    case 'admin':
+      if (!token || !currentUser || currentUser.role !== 'super_admin') { navigateTo('home'); return; }
+      loadAdminOrganizerRequests();
       break;
     case 'login':
     case 'register':
@@ -56,7 +65,15 @@ function navigateTo(page, data) {
 function updateNav() {
   const navAuth = document.getElementById('nav-auth');
   if (token && currentUser) {
-    navAuth.innerHTML = `<a href="#" class="nav__link" onclick="navigateTo('profile')" id="nav-profile">${currentUser.email.split('@')[0]}</a>`;
+    let links = '';
+    if (currentUser.role === 'organizer' || currentUser.role === 'super_admin') {
+      links += `<a href="#" class="nav__link" onclick="navigateTo('create-event')" id="nav-create-event">+ Мероприятие</a>`;
+    }
+    if (currentUser.role === 'super_admin') {
+      links += `<a href="#" class="nav__link" onclick="navigateTo('admin')" id="nav-admin">Админка</a>`;
+    }
+    links += `<a href="#" class="nav__link" onclick="navigateTo('profile')" id="nav-profile">${currentUser.email.split('@')[0]}</a>`;
+    navAuth.innerHTML = links;
   } else {
     navAuth.innerHTML = `<a href="#" class="nav__link" onclick="navigateTo('login')" id="nav-login">Войти</a>`;
   }
@@ -72,7 +89,10 @@ async function apiRequest(endpoint, options = {}) {
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
 
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, config);
+    const url = config.method && config.method !== 'GET'
+      ? `${API_URL}${endpoint}`
+      : `${API_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+    const response = await fetch(url, config);
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || `HTTP Error ${response.status}`);
     return data;
@@ -333,10 +353,12 @@ async function loadProfile() {
 
     const roleEl = document.getElementById('profile-role');
     const role = currentUser.role || 'user';
-    roleEl.textContent = role;
+    const roleNames = { user: 'Пользователь', organizer: 'Организатор', super_admin: 'Администратор' };
+    roleEl.textContent = roleNames[role] || role;
     roleEl.className = `profile__role badge badge--${role}`;
 
     updateNav();
+    updateOrganizerBanner();
   } catch (error) {
     if (error.message.includes('401') || error.message.toLowerCase().includes('token')) {
       handleLogout();
@@ -390,6 +412,153 @@ async function loadMyRegistrations() {
           </div>
         </div>`;
     }).join('');
+  } catch (error) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">😔</div><p class="empty-state__text">${error.message}</p></div>`;
+  }
+}
+
+// ORGANIZER REQUEST
+async function requestOrganizerRole() {
+  try {
+    await apiRequest('/organizer/request', { method: 'POST' });
+    showToast('Заявка отправлена! Ожидайте одобрения администратора.', 'success');
+    updateOrganizerBanner();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function updateOrganizerBanner() {
+  const banner = document.getElementById('organizer-request-banner');
+  if (!banner || !currentUser) { if (banner) banner.style.display = 'none'; return; }
+
+  if (currentUser.role === 'user') {
+    banner.style.display = 'block';
+    // Check if there's already a pending request
+    apiRequest('/organizer/request/status').then(data => {
+      const status = (data.data && data.data.status) || null;
+      if (status === 'pending') {
+        banner.className = 'organizer-banner organizer-banner--pending';
+        banner.querySelector('.organizer-banner__text h3').textContent = 'Заявка на рассмотрении';
+        banner.querySelector('.organizer-banner__text p').textContent = 'Администратор скоро рассмотрит вашу заявку';
+        const btn = document.getElementById('request-organizer-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Ожидание...'; }
+      }
+    }).catch(() => {});
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// CREATE EVENT
+async function handleCreateEvent(e) {
+  e.preventDefault();
+  clearFormErrors();
+
+  const title = document.getElementById('event-title').value.trim();
+  const description = document.getElementById('event-description').value.trim();
+  const dateTime = document.getElementById('event-datetime').value;
+  const capacity = parseInt(document.getElementById('event-capacity').value);
+  const city = document.getElementById('event-city').value.trim();
+  const address = document.getElementById('event-address').value.trim();
+
+  if (!title || !description || !dateTime || !capacity || !city || !address) {
+    showFormError('create-event-error', 'Заполните все поля');
+    return;
+  }
+
+  try {
+    await apiRequest('/events', {
+      method: 'POST',
+      body: JSON.stringify({ title, description, dateTime, capacity, city, address })
+    });
+    showToast('Мероприятие создано!', 'success');
+    document.getElementById('create-event-form').reset();
+    navigateTo('home');
+  } catch (error) {
+    showFormError('create-event-error', error.message);
+  }
+}
+
+// ADMIN PANEL
+let currentAdminTab = 'requests';
+
+function switchAdminTab(tab) {
+  currentAdminTab = tab;
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+
+  if (tab === 'requests') loadAdminOrganizerRequests();
+  else if (tab === 'users') loadAdminUsers();
+}
+
+async function loadAdminOrganizerRequests() {
+  const container = document.getElementById('admin-content');
+  container.innerHTML = '<div class="loader">Загрузка заявок...</div>';
+
+  try {
+    const data = await apiRequest('/admin/organizer-requests?limit=50');
+    const requests = data.data || [];
+
+    if (requests.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📭</div><p class="empty-state__text">Заявок пока нет</p></div>`;
+      return;
+    }
+
+    container.innerHTML = requests.map(req => {
+      const user = req.userId || {};
+      const date = formatDate(req.createdAt);
+      const isPending = req.status === 'pending';
+
+      return `
+        <div class="request-card">
+          <div class="request-card__info">
+            <div class="request-card__email">${escapeHtml(user.email || 'Неизвестный')}</div>
+            <div class="request-card__date">Подана: ${date}</div>
+          </div>
+          <span class="request-card__status request-card__status--${req.status}">${req.status === 'pending' ? 'Ожидает' : req.status === 'approved' ? 'Одобрена' : 'Отклонена'}</span>
+          ${isPending ? `
+            <div class="request-card__actions">
+              <button class="btn btn--success btn--sm" onclick="handleOrganizerRequest('${req._id}', 'approve')">Одобрить</button>
+              <button class="btn btn--danger btn--sm" onclick="handleOrganizerRequest('${req._id}', 'reject')">Отклонить</button>
+            </div>
+          ` : ''}
+        </div>`;
+    }).join('');
+  } catch (error) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">😔</div><p class="empty-state__text">${error.message}</p></div>`;
+  }
+}
+
+async function handleOrganizerRequest(requestId, action) {
+  try {
+    await apiRequest(`/admin/organizer-requests/${requestId}/${action}`, { method: 'POST' });
+    showToast(action === 'approve' ? 'Заявка одобрена!' : 'Заявка отклонена', action === 'approve' ? 'success' : 'info');
+    loadAdminOrganizerRequests();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function loadAdminUsers() {
+  const container = document.getElementById('admin-content');
+  container.innerHTML = '<div class="loader">Загрузка пользователей...</div>';
+
+  try {
+    const data = await apiRequest('/admin/users');
+    const users = data.data || [];
+
+    if (users.length === 0) {
+      container.innerHTML = `<div class="empty-state"><p class="empty-state__text">Пользователей нет</p></div>`;
+      return;
+    }
+
+    container.innerHTML = users.map(user => `
+      <div class="user-card">
+        <div class="user-card__email">${escapeHtml(user.email)}</div>
+        <span class="badge badge--${user.role}">${user.role}</span>
+      </div>
+    `).join('');
   } catch (error) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">😔</div><p class="empty-state__text">${error.message}</p></div>`;
   }

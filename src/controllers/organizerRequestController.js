@@ -106,4 +106,16 @@ const rejectOrganizerRequest = async (req, res) => {
   }
 };
 
-module.exports = { submitOrganizerRequest, getOrganizerRequests, approveOrganizerRequest, rejectOrganizerRequest };
+// GET /api/organizer/request/status
+const getMyRequestStatus = async (req, res) => {
+  try {
+    const request = await OrganizerRequest.findOne({ userId: req.user._id }).sort({ createdAt: -1 });
+    if (!request) return res.status(404).json({ success: false, message: 'No request found' });
+    res.status(200).json({ success: true, data: { status: request.status, createdAt: request.createdAt } });
+  } catch (error) {
+    console.error('Get request status error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { submitOrganizerRequest, getOrganizerRequests, approveOrganizerRequest, rejectOrganizerRequest, getMyRequestStatus };

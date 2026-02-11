@@ -126,7 +126,21 @@
               <span id="profile-role" class="profile__role badge">user</span>
               <p id="profile-date" class="profile__date"></p>
             </div>
-            <button class="btn btn--outline" onclick="handleLogout()">Выйти</button>
+            <div class="profile__actions">
+              <button class="btn btn--outline" onclick="handleLogout()">Выйти</button>
+            </div>
+          </div>
+
+          <!-- Organizer request banner (for regular users) -->
+          <div id="organizer-request-banner" class="organizer-banner" style="display:none">
+            <div class="organizer-banner__content">
+              <div class="organizer-banner__icon">🎤</div>
+              <div class="organizer-banner__text">
+                <h3>Хотите проводить мероприятия?</h3>
+                <p>Подайте заявку на роль организатора — администратор рассмотрит её</p>
+              </div>
+              <button class="btn btn--accent" id="request-organizer-btn" onclick="requestOrganizerRole()">Стать организатором</button>
+            </div>
           </div>
 
           <!-- Stats -->
@@ -150,6 +164,66 @@
             <div id="my-registrations" class="events-grid">
               <div class="loader">Загрузка...</div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CREATE EVENT PAGE (organizer / super_admin) -->
+    <section id="page-create-event" class="page">
+      <div class="container">
+        <button class="back-btn" onclick="navigateTo('profile')">&larr; Назад в профиль</button>
+        <div class="auth-card" style="max-width:600px;margin:0 auto">
+          <h2 class="auth-card__title">Создать мероприятие</h2>
+          <form id="create-event-form" onsubmit="handleCreateEvent(event)">
+            <div class="form-group">
+              <label class="form-label">Название</label>
+              <input type="text" id="event-title" class="form-input" placeholder="Название мероприятия" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Описание</label>
+              <textarea id="event-description" class="form-input form-textarea" placeholder="Подробное описание..." required rows="4"></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group form-group--half">
+                <label class="form-label">Дата и время</label>
+                <input type="datetime-local" id="event-datetime" class="form-input" required>
+              </div>
+              <div class="form-group form-group--half">
+                <label class="form-label">Вместимость</label>
+                <input type="number" id="event-capacity" class="form-input" placeholder="100" min="1" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group form-group--half">
+                <label class="form-label">Город</label>
+                <input type="text" id="event-city" class="form-input" placeholder="Алматы" required>
+              </div>
+              <div class="form-group form-group--half">
+                <label class="form-label">Адрес</label>
+                <input type="text" id="event-address" class="form-input" placeholder="ул. Абая 100" required>
+              </div>
+            </div>
+            <div id="create-event-error" class="form-error"></div>
+            <button type="submit" class="btn btn--primary btn--full">Создать мероприятие</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN PANEL PAGE (super_admin only) -->
+    <section id="page-admin" class="page">
+      <div class="container">
+        <div class="admin-panel">
+          <h2 class="admin-panel__title">Панель администратора</h2>
+
+          <div class="admin-tabs">
+            <button class="admin-tab active" onclick="switchAdminTab('requests')" id="tab-requests">Заявки организаторов</button>
+            <button class="admin-tab" onclick="switchAdminTab('users')" id="tab-users">Все пользователи</button>
+          </div>
+
+          <div id="admin-content" class="admin-content">
+            <div class="loader">Загрузка...</div>
           </div>
         </div>
       </div>
