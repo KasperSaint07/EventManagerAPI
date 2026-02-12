@@ -640,3 +640,4 @@ function getEventEmoji(title) {
   if (lower.includes('лекц') || lower.includes('lecture') || lower.includes('образован')) return '📚';
   return '🎫';
 }
+ 
